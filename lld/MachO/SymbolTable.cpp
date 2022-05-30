@@ -314,6 +314,10 @@ void lld::macho::treatUndefinedSymbol(const Undefined &sym, StringRef source) {
   if (name.consume_front("segment$end$"))
     return handleSegmentBoundarySymbol(sym, name, Boundary::End);
 
+  // Leave dtrace symbols, since we will handle them when we do the relocation
+  if (name.startswith("___dtrace_"))
+    return;
+
   // Handle -U.
   if (config->explicitDynamicLookups.count(sym.getName())) {
     symtab->addDynamicLookup(sym.getName());
