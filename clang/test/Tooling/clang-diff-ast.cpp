@@ -51,6 +51,30 @@ class X : Base {
     return 0;
   }
 
+  const wchar_t *fooWide(int i) {
+    if (i == 0)
+      // CHECK: StringLiteral: foo(
+      return L"foo";
+    // CHECK-NOT: ImplicitCastExpr
+    return 0;
+  }
+
+  const char16_t *fooU16(int i) {
+    if (i == 0)
+      // CHECK: StringLiteral: foo(
+      return u"foo";
+    // CHECK-NOT: ImplicitCastExpr
+    return 0;
+  }
+
+  const char32_t *fooU32(int i) {
+    if (i == 0)
+      // CHECK: StringLiteral: foo(
+      return U"foo";
+    // CHECK-NOT: ImplicitCastExpr
+    return 0;
+  }
+
   // CHECK: AccessSpecDecl: public(
 public:
   int not_initialized;

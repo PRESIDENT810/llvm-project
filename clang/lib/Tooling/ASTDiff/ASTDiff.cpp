@@ -16,6 +16,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Lex/Lexer.h"
 #include "llvm/ADT/PriorityQueue.h"
+#include "llvm/Support/ConvertUTF.h"
 
 #include <limits>
 #include <memory>
@@ -463,8 +464,39 @@ std::string SyntaxTree::Impl::getStmtValue(const Stmt *S) const {
   }
   if (auto *D = dyn_cast<DeclRefExpr>(S))
     return getRelativeName(D->getDecl(), getEnclosingDeclContext(AST, S));
-  if (auto *String = dyn_cast<StringLiteral>(S))
+  if (auto *String = dyn_cast<StringLiteral>(S)) {
+    if (String->isWide()) {
+      unsigned int wsize = String->getByteLength() / String->getCharByteWidth();
+      const auto *temp =
+          reinterpret_cast<const wchar_t *>(String->getBytes().data());
+      std::wstring wstr(temp, wsize);
+      std::string str;
+      if (!convertWideToUTF8(wstr, str))
+        return "";
+      return str;
+    }
+    if (String->isUTF16()) {
+      unsigned int usize = String->getByteLength() / String->getCharByteWidth();
+      const auto *temp =
+          reinterpret_cast<const unsigned short *>(String->getBytes().data());
+      ArrayRef<UTF16> u16str(temp, usize);
+      std::string str;
+      if (!convertUTF16ToUTF8String(u16str, str))
+        return "";
+      return str;
+    }
+    if (String->isUTF32()) {
+      unsigned int usize = String->getByteLength() / String->getCharByteWidth();
+      const auto *temp =
+          reinterpret_cast<const unsigned int *>(String->getBytes().data());
+      ArrayRef<UTF32> u32str(temp, usize);
+      std::string str;
+      if (!convertUTF32ToUTF8String(u32str, str))
+        return "";
+      return str;
+    }
     return std::string(String->getString());
+  }
   if (auto *B = dyn_cast<CXXBoolLiteralExpr>(S))
     return B->getValue() ? "true" : "false";
   return "";
