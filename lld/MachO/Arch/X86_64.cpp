@@ -38,6 +38,8 @@ struct X86_64 : TargetInfo {
   void relaxGotLoad(uint8_t *loc, uint8_t type) const override;
   const RelocAttrs &getRelocAttrs(uint8_t type) const override;
   uint64_t getPageSize() const override { return 4 * 1024; }
+
+  void handleDtraceReloc(const Symbol *sym, const Reloc r, uint8_t *loc) const override;
 };
 
 } // namespace
@@ -193,4 +195,44 @@ X86_64::X86_64() : TargetInfo(LP64()) {
 TargetInfo *macho::createX86_64TargetInfo() {
   static X86_64 t;
   return &t;
+}
+
+void X86_64::handleDtraceReloc(const Symbol *sym, const Reloc r, uint8_t *loc) const{
+  assert(r.type == X86_64_RELOC_BRANCH);
+
+  if (!r.pcrel)
+    error("Not pcrel and X86_64_RELOC_BRANCH not supported");
+
+  if (r.length != 2)
+    error("r_length != 2 and X86_64_RELOC_BRANCH not supported");
+
+  if (sym->getName().startswith("___dtrace_probe")){
+    // ld64: fixup is kindStoreX86DtraceCallSiteNop
+    if (config->outputType == MH_OBJECT){
+      return;
+    }
+    // change call site to a NOP
+    // loc[-1] = 0x90;	// 1-byte nop
+    // loc[0] = 0x0F;	// 4-byte nop
+    // loc[1] = 0x1F;
+    // loc[2] = 0x40;
+    // loc[3] = 0x00;
+    write32le(loc-4, (read32le(loc-4) & 0x00ffffff) | 0x90000000);
+    write32le(loc, 0x00401F0F);
+  } else if (sym->getName().startswith("___dtrace_isenabled")){
+    // ld64: fixup is kindStoreX86DtraceIsEnableSiteClear
+    if (config->outputType == MH_OBJECT){
+      return;
+    }
+    // change call site to a clear eax
+    // loc[-1] = 0x33;		// xorl eax,eax
+    // loc[0] = 0xC0;
+    // loc[1] = 0x90;		// 1-byte nop
+    // loc[2] = 0x90;		// 1-byte nop
+    // loc[3] = 0x90;		// 1-byte nop
+    write32le(loc-4, (read32le(loc-4) & 0x00ffffff) | 0x33000000);
+    write32le(loc, 0x909090C0);
+  } else{
+    error("Unrecognized dtrace symbol prefix: "+sym->getName());
+  }
 }

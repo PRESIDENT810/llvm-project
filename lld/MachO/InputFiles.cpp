@@ -44,6 +44,7 @@
 #include "InputFiles.h"
 #include "Config.h"
 #include "Driver.h"
+#include "Dtrace.h"
 #include "Dwarf.h"
 #include "ExportTrie.h"
 #include "InputSection.h"
@@ -721,6 +722,8 @@ void ObjFile::parseSymbols(ArrayRef<typename LP::section> sectionHeaders,
         continue;
       symbolsBySection[sym.n_sect - 1].push_back(i);
     } else if (isUndef(sym)) {
+      // If sym is a dtrace provider, add the provider info
+      checkDtraceProvider(name);
       undefineds.push_back(i);
     } else {
       symbols[i] = parseNonSectionSymbol(sym, name);

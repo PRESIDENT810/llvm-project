@@ -13,6 +13,7 @@ add_lld_library(lldMachO
   ConcatOutputSection.cpp
   Driver.cpp
   DriverUtils.cpp
+  Dtrace.cpp
   Dwarf.cpp
   ExportTrie.cpp
   ICF.cpp

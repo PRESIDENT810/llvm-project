@@ -76,6 +76,10 @@ public:
 
   bool usesThunks() const { return thunkSize > 0; }
 
+  virtual void handleDtraceReloc(const Symbol *sym, const Reloc r, uint8_t *loc) const{
+    llvm_unreachable("Dtrace support for current architecture not implemented yet");
+  }
+
   uint32_t magic;
   llvm::MachO::CPUType cpuType;
   uint32_t cpuSubtype;

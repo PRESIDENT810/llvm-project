@@ -9,6 +9,7 @@
 #include "InputSection.h"
 #include "ConcatOutputSection.h"
 #include "Config.h"
+#include "Dtrace.h"
 #include "InputFiles.h"
 #include "OutputSegment.h"
 #include "Symbols.h"
@@ -141,6 +142,12 @@ void ConcatInputSection::writeTo(uint8_t *buf) {
       if (target->hasAttr(r.type, RelocAttrBits::LOAD) &&
           !referentSym->isInGot())
         target->relaxGotLoad(loc, r.type);
+      // For dtrace symbols, do not handle them as normal undefined symbols
+      if (isDtraceSym(referentSym->getName())){
+        // Change dtrace call site to pre-defined instructions
+        resolveDtraceSymbol(referentSym, r, loc);
+        continue;
+      }
       referentVA = resolveSymbolVA(referentSym, r.type) + r.addend;
 
       if (isThreadLocalVariables(getFlags())) {

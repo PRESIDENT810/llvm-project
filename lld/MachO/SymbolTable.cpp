@@ -9,6 +9,7 @@
 #include "SymbolTable.h"
 #include "ConcatOutputSection.h"
 #include "Config.h"
+#include "Dtrace.h"
 #include "InputFiles.h"
 #include "InputSection.h"
 #include "Symbols.h"
@@ -313,6 +314,11 @@ void lld::macho::treatUndefinedSymbol(const Undefined &sym, StringRef source) {
     return handleSegmentBoundarySymbol(sym, name, Boundary::Start);
   if (name.consume_front("segment$end$"))
     return handleSegmentBoundarySymbol(sym, name, Boundary::End);
+
+  // Leave dtrace symbols, since we will handle them when we do the relocation
+  if (isDtraceSym(name)) {
+    return;
+  }
 
   // Handle -U.
   if (config->explicitDynamicLookups.count(sym.getName())) {
