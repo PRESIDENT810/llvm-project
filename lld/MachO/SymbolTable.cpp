@@ -93,7 +93,7 @@ Defined *SymbolTable::addDefined(StringRef name, InputFile *file,
         message += toString(defined->getFile()) + "\n>>> defined in ";
         if (!src2.empty())
           message += src2 + "\n>>>            ";
-        error(message + toString(file));
+        warn(message + toString(file));
       }
 
     } else if (auto *dysym = dyn_cast<DylibSymbol>(s)) {
