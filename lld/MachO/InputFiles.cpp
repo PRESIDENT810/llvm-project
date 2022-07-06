@@ -1512,6 +1512,25 @@ ArchiveFile::ArchiveFile(std::unique_ptr<object::Archive> &&f)
     : InputFile(ArchiveKind, f->getMemoryBufferRef()), file(std::move(f)) {}
 
 void ArchiveFile::addLazySymbols() {
+  Error err = Error::success();
+  Expected<MemoryBufferRef> mbOrErr = this->file->child_begin(err)->getMemoryBufferRef();
+  if (err || mbOrErr.takeError())
+    return;
+  if (identify_magic(mbOrErr->getBuffer()) == file_magic::macho_object){
+    Architecture arch;
+    if (target->wordSize == 8){
+      auto *hdr = reinterpret_cast<const LP64::mach_header *>(mbOrErr->getBufferStart());
+      arch = getArchitectureFromCpuType(hdr->cputype, hdr->cpusubtype);
+    } else{
+      auto *hdr = reinterpret_cast<const ILP32::mach_header *>(mbOrErr->getBufferStart());
+      arch = getArchitectureFromCpuType(hdr->cputype, hdr->cpusubtype);
+    }
+    if (arch != config->arch()) {
+      warn("Archive's architecture does not match the target architecture");
+      return;
+    }
+  }
+
   for (const object::Archive::Symbol &sym : file->symbols())
     symtab->addLazyArchive(sym.getName(), this, sym);
 }
