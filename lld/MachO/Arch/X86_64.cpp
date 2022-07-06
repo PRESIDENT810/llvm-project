@@ -38,6 +38,9 @@ struct X86_64 : TargetInfo {
   void relaxGotLoad(uint8_t *loc, uint8_t type) const override;
   const RelocAttrs &getRelocAttrs(uint8_t type) const override;
   uint64_t getPageSize() const override { return 4 * 1024; }
+
+  void handleDtraceReloc(const Symbol *sym, const Reloc r,
+                         uint8_t *loc) const override;
 };
 
 } // namespace
@@ -193,4 +196,31 @@ X86_64::X86_64() : TargetInfo(LP64()) {
 TargetInfo *macho::createX86_64TargetInfo() {
   static X86_64 t;
   return &t;
+}
+
+void X86_64::handleDtraceReloc(const Symbol *sym, const Reloc r,
+                               uint8_t *loc) const {
+  assert(r.type == X86_64_RELOC_BRANCH);
+
+  if (sym->getName().startswith("___dtrace_probe")) {
+    if (config->outputType == MH_OBJECT)
+      return;
+    // change call site to a NOP
+    loc[-1] = 0x90; // 1-byte nop
+    loc[0] = 0x0F;  // 4-byte nop
+    loc[1] = 0x1F;
+    loc[2] = 0x40;
+    loc[3] = 0x00;
+  } else if (sym->getName().startswith("___dtrace_isenabled")) {
+    if (config->outputType == MH_OBJECT)
+      return;
+    // change call site to a clear eax
+    loc[-1] = 0x33; // xorl eax,eax
+    loc[0] = 0xC0;
+    loc[1] = 0x90; // 1-byte nop
+    loc[2] = 0x90; // 1-byte nop
+    loc[3] = 0x90; // 1-byte nop
+  } else {
+    error("Unrecognized dtrace symbol prefix: " + sym->getName());
+  }
 }
