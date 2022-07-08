@@ -268,18 +268,36 @@ static InputFile *addFile(StringRef path, ForceLoad forceLoadArchive,
     // loadArchiveMember() call below may recursively call addFile() and
     // invalidate this reference.
     auto entry = loadedArchives.find(path);
-    if (entry != loadedArchives.end())
-      return entry->second;
-
-    std::unique_ptr<object::Archive> archive = CHECK(
-        object::Archive::create(mbref), path + ": failed to parse archive");
-
-    if (!archive->isEmpty() && !archive->hasSymbolTable())
-      error(path + ": archive has no index; run ranlib to add one");
-
-    auto *file = make<ArchiveFile>(std::move(archive));
+    ArchiveFile::LoadLevel currentLevel;
     if ((forceLoadArchive == ForceLoad::Default && config->allLoad) ||
-        forceLoadArchive == ForceLoad::Yes) {
+          forceLoadArchive == ForceLoad::Yes){
+      currentLevel = ArchiveFile::LoadLevel::allLoad;
+    } else if (forceLoadArchive == ForceLoad::Default && config->forceLoadObjC){
+      currentLevel = ArchiveFile::LoadLevel::objCLoad;
+    } else{
+      currentLevel = ArchiveFile::LoadLevel::lazyLoad;
+    }
+
+    ArchiveFile *file;
+    if (entry != loadedArchives.end() && entry->second->loadLevel >= currentLevel){
+      // Load level is not enlarged, so we can use the cached archive
+      return entry->second;
+    }
+
+    if (entry == loadedArchives.end()){
+      // No cached archive, we need to create a new one
+      std::unique_ptr<object::Archive> archive = CHECK(object::Archive::create(mbref), path + ": failed to parse archive");
+
+      if (!archive->isEmpty() && !archive->hasSymbolTable())
+        error(path + ": archive has no index; run ranlib to add one");
+      file = make<ArchiveFile>(std::move(archive));
+    } else{
+      // Load level enlarged, we need to load more symbols by fetching members
+      file = entry->second;
+    }
+    file->loadLevel = currentLevel;
+
+    if (currentLevel == ArchiveFile::LoadLevel::allLoad) {
       if (Optional<MemoryBufferRef> buffer = readFile(path)) {
         Error e = Error::success();
         for (const object::Archive::Child &c : file->getArchive().children(e)) {
@@ -293,8 +311,7 @@ static InputFile *addFile(StringRef path, ForceLoad forceLoadArchive,
           error(toString(file) +
                 ": Archive::children failed: " + toString(std::move(e)));
       }
-    } else if (forceLoadArchive == ForceLoad::Default &&
-               config->forceLoadObjC) {
+    } else if (currentLevel == ArchiveFile::LoadLevel::objCLoad) {
       for (const object::Archive::Symbol &sym : file->getArchive().symbols())
         if (sym.getName().startswith(objc::klass))
           file->fetch(sym);
