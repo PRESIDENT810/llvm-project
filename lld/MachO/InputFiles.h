@@ -238,6 +238,13 @@ public:
   const llvm::object::Archive &getArchive() const { return *file; };
   static bool classof(const InputFile *f) { return f->kind() == ArchiveKind; }
 
+  enum LoadLevel{
+    lazyLoad,
+    objCLoad,
+    allLoad,
+  };
+  LoadLevel loadLevel;
+
 private:
   std::unique_ptr<llvm::object::Archive> file;
   // Keep track of children fetched from the archive by tracking
