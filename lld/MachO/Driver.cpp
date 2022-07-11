@@ -455,13 +455,13 @@ void macho::parseLCLinkerOption(InputFile *f, unsigned argc, StringRef data) {
   if (arg.consume_front("-l")) {
     ForceLoad forceLoadArchive =
         config->forceLoadSwift && arg.startswith("swift") ? ForceLoad::Yes
-                                                          : ForceLoad::No;
+                                                          : ForceLoad::Default;
     addLibrary(arg, /*isNeeded=*/false, /*isWeak=*/false,
                /*isReexport=*/false, /*isExplicit=*/false, forceLoadArchive);
   } else if (arg == "-framework") {
     StringRef name = argv[++i];
     addFramework(name, /*isNeeded=*/false, /*isWeak=*/false,
-                 /*isReexport=*/false, /*isExplicit=*/false, ForceLoad::No);
+                 /*isReexport=*/false, /*isExplicit=*/false, ForceLoad::Default);
   } else {
     error(arg + " is not allowed in LC_LINKER_OPTION");
   }
