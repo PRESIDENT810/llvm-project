@@ -456,6 +456,17 @@ static void addFramework(StringRef name, bool isNeeded, bool isWeak,
   warn("framework not found for -framework " + name);
 }
 
+struct LCLinkerOptionInfo{
+  enum FileType{
+    Library,
+    Framework
+  };
+  FileType fileType;
+  StringRef filename;
+};
+
+static std::vector<LCLinkerOptionInfo> LCLinkerOptionInfoVec;
+
 // Parses LC_LINKER_OPTION contents, which can add additional command line
 // flags. This directly parses the flags instead of using the standard argument
 // parser to improve performance.
@@ -472,14 +483,16 @@ void macho::parseLCLinkerOption(InputFile *f, unsigned argc, StringRef data) {
   unsigned i = 0;
   StringRef arg = argv[i];
   if (arg.consume_front("-l")) {
-    addLibrary(arg, /*isNeeded=*/false, /*isWeak=*/false,
-               /*isReexport=*/false, /*isExplicit=*/false,
-               LoadType::LCLinkerOption);
+    LCLinkerOptionInfoVec.emplace_back(LCLinkerOptionInfo{
+        LCLinkerOptionInfo::FileType::Library,
+        arg,
+    });
   } else if (arg == "-framework") {
     StringRef name = argv[++i];
-    addFramework(name, /*isNeeded=*/false, /*isWeak=*/false,
-                 /*isReexport=*/false, /*isExplicit=*/false,
-                 LoadType::LCLinkerOption);
+    LCLinkerOptionInfoVec.emplace_back(LCLinkerOptionInfo{
+        LCLinkerOptionInfo::FileType::Framework,
+        name,
+    });
   } else {
     error(arg + " is not allowed in LC_LINKER_OPTION");
   }
@@ -1065,6 +1078,18 @@ static void createFiles(const InputArgList &args) {
       break;
     default:
       break;
+    }
+  }
+  for (const LCLinkerOptionInfo &info : LCLinkerOptionInfoVec){
+    if (info.fileType == LCLinkerOptionInfo::Library){
+      addLibrary(info.filename, /*isNeeded=*/false, /*isWeak=*/false,
+                 /*isReexport=*/false, /*isExplicit=*/false,
+                 LoadType::LCLinkerOption);
+    }
+    else {
+      addFramework(info.filename, /*isNeeded=*/false, /*isWeak=*/false,
+                   /*isReexport=*/false, /*isExplicit=*/false,
+                   LoadType::LCLinkerOption);
     }
   }
 }
